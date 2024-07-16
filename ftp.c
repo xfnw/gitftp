@@ -149,7 +149,7 @@ static void chomp(char *s)
 	s[strcspn(s, "\n\r")] = '\0';
 }
 
-void ftp_session(int sock, int *server_ip, const char *gitpath)
+void ftp_session(int sock, int *server_ip, const char *gitpath, const char *branch)
 {
 	char sha[8];
 	char cmd[CLIENT_BUFSZ];
@@ -160,6 +160,7 @@ void ftp_session(int sock, int *server_ip, const char *gitpath)
 	char pasv_desc[26]; /* format (%d,%d,%d,%d,%d,%d) */
 
 	git_repository *repo;
+	git_object *obj;
 	git_commit *ci;
 	git_time_t epoch;
 	git_tree *root, *cur_dir, *new_dir;
@@ -174,18 +175,17 @@ void ftp_session(int sock, int *server_ip, const char *gitpath)
 	git_or_die(conn, git_libgit2_init());
 	atexit(cleanup_git);
 
-	git_or_die(conn, git_repository_open(&repo, gitpath) );
-	// try main branch, and fall back to master
-	if (git_revparse_single((git_object **)&root, repo, "main^{tree}") != 0)
-		git_or_die(conn, git_revparse_single((git_object **)&root, repo, "master^{tree}") );
-	if (git_revparse_single((git_object **)&ci, repo, "main^{commit}") != 0)
-		git_or_die(conn, git_revparse_single((git_object **)&ci, repo, "master^{commit}") );
+	git_or_die(conn, git_repository_open(&repo, gitpath));
+	git_or_die(conn, git_revparse_single(&obj, repo, branch));
+	git_or_die(conn, git_object_peel((git_object **)&ci, obj, GIT_OBJECT_COMMIT));
+	git_or_die(conn, git_commit_tree(&root, ci));
 	epoch = git_commit_time(ci);
 	cur_dir = root;
 
 	fprintf(conn, "220 Browsing at SHA (%s)\n",
 	        git_oid_tostr(sha, sizeof sha, git_object_id((git_object*)ci)));
 
+	git_object_free(obj);
 	git_commit_free(ci);
 
 	while (fgets(cmd, CLIENT_BUFSZ, conn) != NULL)

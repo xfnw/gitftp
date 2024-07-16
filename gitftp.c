@@ -24,15 +24,18 @@ void wait_for_kids(void)
 
 int main(int argc, char **argv)
 {
+	char *branch = "HEAD";
 	int sock, accepted;
 	pid_t pid;
 	int ip[4];
 
-	if (argc != 2)
+	if (argc < 2 || argc > 3)
 	{
-		fprintf(stderr, "Usage: %s repo-path\n", *argv);
+		fprintf(stderr, "Usage: %s repo-path [branch]\n", *argv);
 		return EXIT_FAILURE;
 	}
+	if (argc == 3)
+		branch = argv[2];
 
 	sock = negotiate_listen(DEFAULT_PORT);
 	if (sock < 0)
@@ -58,7 +61,7 @@ int main(int argc, char **argv)
 		{
 			close(sock); /* belongs to parent */
 
-			ftp_session(accepted, ip, argv[1]);
+			ftp_session(accepted, ip, argv[1], branch);
 			exit(EXIT_SUCCESS);
 		}
 		close(accepted); /* child has its own dup */
